@@ -35,23 +35,15 @@ def solid_black(pos, data, width):
     return True
 
 
-def run():
-    im = image.ImageGrabber()
-    bbox = np.GetGameArea()
-    if bbox is None:
-        print("Could not locate neopets game area")
-        return
-
+def create_mask(area):
     start = None
     end = None
-
-    area = im.grab_area(bbox, False)
-    mask = Image.new('RGB', (area.width, area.height), (255, 255, 255))
+    mask = Image.new('RGB', (area.width, area.height), (255,255,255))
     data = area.getdata()
-    print("Area: {}x{}".format(area.width, area.height))
+    # print("Area: {}x{}".format(area.width, area.height))
     for y in range(area.height - 1):
         for x in range(area.width - 1):
-            pixel = area.getpixel((x,y))
+            pixel = area.getpixel((x, y))
             if pixel == (0, 0, 0):
                 if solid_black((x, y), data, area.width):
                     mask.putpixel((x, y), (0, 0, 0))
@@ -63,6 +55,19 @@ def run():
                 if start is None:
                     start = x, y
                 mask.putpixel((x, y), (0, 0, 0))
+    return start, end, mask
+
+
+def run():
+    im = image.ImageGrabber()
+    bbox = np.GetGameArea()
+    if bbox is None:
+        print("Could not locate neopets game area")
+        return
+
+    area = im.grab_area(bbox, False)
+    start, end, mask = create_mask(area)
+    
     print(start)
     mask.show("Game Mask")
 

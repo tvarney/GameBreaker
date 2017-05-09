@@ -27,12 +27,22 @@ def _get_pixel(pos, offset, width, data):
     return data[(pos[0] + offset[0]) + (pos[1] + offset[1]) * width]
 
 
+def _set_pixel(pos, offset, image, color):
+    image.putpixel((pos[0] + offset[0], pos[1] + offset[1]), color)
+
+
 def solid_black(pos, data, width):
     for i in range(-2, 2, 1):
         for j in range(-2, 2, 1):
             if _get_pixel(pos, (i, j), width, data) != (0, 0, 0):
                 return False
     return True
+
+
+def draw_centered_rect(image, pos, radius: int, color = (0, 0, 0)):
+    for i in range(-radius, radius, 1):
+        for j in range(-radius, radius, 1):
+            _set_pixel(pos, (i, j), image, color)
 
 
 def create_mask(area):
@@ -51,7 +61,7 @@ def create_mask(area):
                 if end is None:
                     end = x, y
                 mask.putpixel((x, y), (0, 0, 0))
-            elif pixel == (0, 204, 0):
+            elif pixel == (0, 204, 0) or pixel == (0, 156, 0):
                 if start is None:
                     start = x, y
                 mask.putpixel((x, y), (0, 0, 0))
@@ -67,7 +77,11 @@ def run():
 
     area = im.grab_area(bbox, False)
     start, end, mask = create_mask(area)
-    
+    if start is not None:
+        draw_centered_rect(mask, start, 2, (0, 255, 0))
+    if end is not None:
+        draw_centered_rect(mask, end, 2, (255, 0, 0))
+
     print(start)
     mask.show("Game Mask")
 

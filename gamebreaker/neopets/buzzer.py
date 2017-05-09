@@ -7,22 +7,16 @@ import win32api, win32con
 from time import sleep
 
 target_color = (204, 0, 0)
-start_color = (0, 204, 0)
+
 wire_color = (0, 0, 0)
 used_color = (255, 0, 255)
+
+start_colors = [(0, g, 0) for g in range(142, 206)]
+_offsets = [(0, 1), (0, -1), (-1,  0), (1, 0), (-1, 1), (1, 1), (-1, -1), (1, -1)]
 
 
 def add_pos(vec, add):
     return vec[0] + add[0], vec[1] + add[1]
-
-
-def is_on_start() -> bool:
-    position = pyautogui.position()
-    return pyautogui.pixelMatchesColor(position[0], position[1], start_color)
-
-
-def move_off_start():
-    return
 
 
 def _get_pixel(pos, offset, width, data):
@@ -33,18 +27,18 @@ def _set_pixel(pos, offset, image, color):
     image.putpixel((pos[0] + offset[0], pos[1] + offset[1]), color)
 
 
-def solid_black(pos, data, width):
-    for i in range(-2, 2, 1):
-        for j in range(-2, 2, 1):
-            if _get_pixel(pos, (i, j), width, data) != (0, 0, 0):
+def check_rect(pos, data, width, colors, radius: int = 2):
+    for i in range(-radius, radius, 1):
+        for j in range(-radius, radius, 1):
+            if not _get_pixel(pos, (i, j), width, data) in colors:
                 return False
     return True
 
 
-def draw_centered_rect(image, pos, radius: int, color = (0, 0, 0)):
+def draw_centered_rect(img, pos, radius: int, color = (0, 0, 0)):
     for i in range(-radius, radius, 1):
         for j in range(-radius, radius, 1):
-            _set_pixel(pos, (i, j), image, color)
+            _set_pixel(pos, (i, j), img, color)
 
 
 def create_mask(area):
@@ -57,17 +51,27 @@ def create_mask(area):
         for x in range(area.width - 1):
             pixel = area.getpixel((x, y))
             if pixel == (0, 0, 0):
-                if solid_black((x, y), data, area.width):
+                if check_rect((x, y), data, area.width, [(0,0,0)]):
                     mask.putpixel((x, y), (0, 0, 0))
             elif pixel == (204, 0, 0):
-                if end is None:
+                if end is None and check_rect((x, y), data, area.width, [(204, 0, 0)]):
                     end = x, y
                 mask.putpixel((x, y), (0, 0, 0))
-            elif pixel == (0, 204, 0) or pixel == (0, 156, 0):
-                if start is None:
+            elif pixel in start_colors:
+                if start is None and check_rect((x, y), data, area.width, start_colors):
                     start = x, y
                 mask.putpixel((x, y), (0, 0, 0))
-    return start, end, mask
+    # Reduce the mask
+    data = mask.getdata()
+    newmask = Image.new('RGB', (area.width, area.height), (255, 255, 255))
+    for y in range(area.height - 1):
+        for x in range(area.width - 1):
+            pixel = mask.getpixel((x, y))
+            if pixel == (0, 0, 0):
+                if check_rect((x, y), data, area.width, [(0, 0, 0)]):
+                    newmask.putpixel((x, y), (0,0,0))
+
+    return start, end, newmask
 
 
 def _sssp_put(array, pos, width, value):
@@ -78,10 +82,15 @@ def _sssp_get(array, pos, width):
     return array[pos[0]+pos[1]*width]
 
 
-_offsets = [
-    (0, 1), (0, -1), (-1,  0), (1, 0), (-1, 1), (1, 1), (-1, -1), (1, -1)
-]
 def dijkstra_sssp(mask, start, stop):
+    if start is None:
+        print("SSSP: Invalid start value of None")
+        return []
+
+    if stop is None:
+        print("SSSP: Invalid stop value of None")
+        return []
+
     width = mask.width
     height = mask.height
 
@@ -122,40 +131,73 @@ def dijkstra_sssp(mask, start, stop):
     return path
 
 
-def run():
+def follow_path(path, ul, start, end):
+    win32api.SetCursorPos((start[0] + ul[0], start[1] + ul[1]))
+    pyautogui.click()
+    for pos in path:
+        win32api.SetCursorPos((pos[0] + ul[0], pos[1] + ul[1]))
+        sleep(0.0022)
+
+    win32api.SetCursorPos((end[0] + ul[0], end[1] + ul[1]))
+
+
+def draw_path(screen, path, start, end):
+    screen.putpixel(start, (255, 0, 255))
+    for pos in path:
+        screen.putpixel(pos, (255, 0, 255))
+    screen.putpixel(end, (255, 0, 255))
+
+
+def play(is_main: bool = False, move_cursor: bool = True):
+    print(is_main)
     im = image.ImageGrabber()
-    bbox = np.GetGameArea()
+    bbox = None
+    if is_main:
+        bbox = np.GetGameArea("../../data")
+    else:
+        bbox = np.GetGameArea()
     if bbox is None:
         print("Could not locate neopets game area")
         return
 
     area = im.grab_area(bbox, False)
     start, end, mask = create_mask(area)
+    start_mask = mask.copy()
+    print("Start: {}\nEnd: {}".format(start, end))
     if start is not None:
-        draw_centered_rect(mask, start, 3, (0, 0, 0))
+        draw_centered_rect(mask, start, 5, (0, 0, 0))
+    else:
+        print("Invalid Start Value!")
+        pos = pyautogui.position()
+        print("Color under cursor: {}".format(pyautogui.pixel(pos[0], pos[1])))
+        return
     if end is not None:
-        draw_centered_rect(mask, end, 3, (0, 0, 0))
+        draw_centered_rect(mask, end, 5, (0, 0, 0))
+    else:
+        print("Invalid end Value!")
+        return
 
     #print(start)
     #mask.show("Game Mask")
 
     path = dijkstra_sssp(mask, start, end)
     ul = bbox['left'], bbox['top']
-    #win32api.SetCursorPos((start[0] + ul[0], start[1] + ul[1]))
+    size = 6
+    while len(path) == 0:
+        draw_centered_rect(mask, start, size, (0,0,0))
+        draw_centered_rect(mask, end, size, (0,0,0))
+        size += 1
+        print("Adjusting start area: {}".format(size))
+        path = dijkstra_sssp(mask, start, end)
+        if size >= 20:
+            start_mask.show()
+            return
 
-    if len(path) == 0:
-        print("No points in path")
-        return
+    if move_cursor:
+        follow_path(path, ul, start, end)
+    else:
+        draw_path(area, path, start, end)
+        area.show("Solution Path")
 
-    pyautogui.click()
-    print("Path Length: {}".format(len(path)))
-    print("Time: {} seconds".format(0.05 * len(path)))
-    for pos in path:
-        win32api.SetCursorPos((pos[0] + ul[0], pos[1] + ul[1]))
-        sleep(0.003)
-
-    win32api.SetCursorPos((end[0] + ul[0], end[1] + ul[1]))
-    # mask.show("Path")
-
-if __name__=="__main__":
-    run()
+if __name__ == "__main__":
+    play(True, True)

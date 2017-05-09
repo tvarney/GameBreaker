@@ -1,12 +1,13 @@
 
 import gamebreaker.image as image
+import os.path
 
 
-def GetGameArea(match_value: float = 0.85):
+def GetGameArea(data_path : str = "./data", match_value: float = 0.85):
     im = image.ImageGrabber()
 
-    img_ul = image.load_from_file("./data/neopets_top_left.png", True)
-    img_br = image.load_from_file("./data/neopets_bottom_right.png", True)
+    img_ul = image.load_from_file(os.path.join(data_path, "neopets_top_left.png"), True)
+    img_br = image.load_from_file(os.path.join(data_path, "neopets_bottom_right.png"), True)
     screen = im.grab_screen(im.AllMonitors, True)
     match_ul = image.find_match(screen, img_ul, image.TM_CCOEFF_NORMED)
     match_br = image.find_match(screen, img_br, image.TM_CCOEFF_NORMED)

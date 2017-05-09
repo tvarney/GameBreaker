@@ -2,7 +2,7 @@
 from gamebreaker import image
 import pyautogui
 import gamebreaker.neopets.common as np
-
+from PIL import Image
 
 target_color = (204, 0, 0)
 start_color = (0, 204, 0)
@@ -23,6 +23,18 @@ def move_off_start():
     return
 
 
+def _get_pixel(pos, offset, width, data):
+    return data[(pos[0] + offset[0]) + (pos[1] + offset[1]) * width]
+
+
+def solid_black(pos, data, width):
+    for i in range(-2, 2, 1):
+        for j in range(-2, 2, 1):
+            if _get_pixel(pos, (i, j), width, data) != (0, 0, 0):
+                return False
+    return True
+
+
 def run():
     im = image.ImageGrabber()
     bbox = np.GetGameArea()
@@ -30,15 +42,29 @@ def run():
         print("Could not locate neopets game area")
         return
 
+    start = None
+    end = None
+
     area = im.grab_area(bbox, False)
-    for y in range(1):
-        for x in range(1):
+    mask = Image.new('RGB', (area.width, area.height), (255, 255, 255))
+    data = area.getdata()
+    print("Area: {}x{}".format(area.width, area.height))
+    for y in range(area.height - 1):
+        for x in range(area.width - 1):
             pixel = area.getpixel((x,y))
-            print(pixel)
-
-
-    area.show("Game Area")
-
+            if pixel == (0, 0, 0):
+                if solid_black((x, y), data, area.width):
+                    mask.putpixel((x, y), (0, 0, 0))
+            elif pixel == (204, 0, 0):
+                if end is None:
+                    end = x, y
+                mask.putpixel((x, y), (0, 0, 0))
+            elif pixel == (0, 204, 0):
+                if start is None:
+                    start = x, y
+                mask.putpixel((x, y), (0, 0, 0))
+    print(start)
+    mask.show("Game Mask")
 
 
 if __name__=="__main__":

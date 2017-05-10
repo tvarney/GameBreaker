@@ -33,13 +33,17 @@ class ImageGrabber(object):
     #     3840x1080: 200 ms
     #     1920x1080: 90 ms
     #     800x600: 35 ms
-    def grab_screen(self, monitor: int, convert: bool = False):
+    def grab_screen(self, monitor: int, convert: bool = False, grayscale: bool = False):
         pixels = self.sct.get_pixels(self.displays[monitor])
         img = Image.frombytes(Format, (self.monitor_dimensions(monitor)), pixels)
+        if grayscale:
+            img.convert('L').convert(Format)
         return numpy.array(img) if convert else img
 
-    def grab_area(self, bbox, convert: bool = False):
+    def grab_area(self, bbox, convert: bool = False, grayscale: bool = False):
         img = Image.frombytes(Format, (bbox['width'], bbox['height']), self.sct.get_pixels(bbox))
+        if grayscale:
+            img = img.convert('L').convert(Format)
         return numpy.array(img) if convert else img
 
 
@@ -52,6 +56,8 @@ def find_match(img_source, img_object, method: int):
     return max_val, max_loc
 
 
-def load_from_file(filename, convert: bool = False):
+def load_from_file(filename, convert: bool = False, grayscale: bool = False):
     img = Image.open(filename, "r")
+    if grayscale:
+        img = img.convert('L').convert(Format)
     return numpy.array(img) if convert else img

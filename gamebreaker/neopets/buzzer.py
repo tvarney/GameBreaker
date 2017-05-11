@@ -5,6 +5,8 @@ import gamebreaker.neopets.common as np
 from PIL import Image
 import win32api, win32con
 from time import sleep
+import random
+import os.path
 
 target_color = (204, 0, 0)
 
@@ -68,7 +70,7 @@ def create_mask(area):
         for x in range(area.width - 1):
             pixel = mask.getpixel((x, y))
             if pixel == (0, 0, 0):
-                if check_rect((x, y), data, area.width, [(0, 0, 0)]):
+                if y < 10 or check_rect((x, y), data, area.width, [(0, 0, 0), 0]):
                     newmask.putpixel((x, y), (0,0,0))
 
     return start, end, newmask
@@ -131,9 +133,11 @@ def dijkstra_sssp(mask, start, stop):
     return path
 
 
-def follow_path(path, ul, start, end):
+def follow_path(path, ul, start, end, random_timing : bool = False):
     win32api.SetCursorPos((start[0] + ul[0], start[1] + ul[1]))
     pyautogui.click()
+    if random_timing:
+        sleep(random.random()*2.0)
     for pos in path:
         win32api.SetCursorPos((pos[0] + ul[0], pos[1] + ul[1]))
         sleep(0.0022)
@@ -148,14 +152,25 @@ def draw_path(screen, path, start, end):
     screen.putpixel(end, (255, 0, 255))
 
 
-def play(is_main: bool = False, move_cursor: bool = True):
+def find_game(im: image.ImageGrabber, data_path: str = "./data/"):
+    # Load the image id we use to find the game
+    img_id = image.load_from_file(os.path.join(data_path, "buzzer_id.png"), True, False)
+    screen = im.grab_screen(image.ImageGrabber.AllMonitors, True, False)
+    match_value, ul = image.find_match(screen, img_id, image.TM_CCOEFF_NORMED)
+    if match_value < 0.85:
+        return None
+
+    return im.make_bbox(ul[0]-10, ul[1]-10, 800, 600)
+
+
+def play(is_main: bool = False, move_cursor: bool = True, random_timing: bool = False):
     print(is_main)
     im = image.ImageGrabber()
     bbox = None
     if is_main:
-        bbox = np.GetGameArea("../../data")
+        bbox = find_game(im, "../../data")
     else:
-        bbox = np.GetGameArea()
+        bbox = find_game(im)
     if bbox is None:
         print("Could not locate neopets game area")
         return
@@ -184,20 +199,21 @@ def play(is_main: bool = False, move_cursor: bool = True):
     ul = bbox['left'], bbox['top']
     size = 6
     while len(path) == 0:
-        draw_centered_rect(mask, start, size, (0,0,0))
-        draw_centered_rect(mask, end, size, (0,0,0))
+        draw_centered_rect(mask, start, size, (0, 0, 0))
+        draw_centered_rect(mask, end, size, (0, 0, 0))
         size += 1
         print("Adjusting start area: {}".format(size))
         path = dijkstra_sssp(mask, start, end)
         if size >= 20:
             start_mask.show()
+            image.apply_mask(area, start_mask, (255, 0, 255)).show()
             return
 
     if move_cursor:
-        follow_path(path, ul, start, end)
+        follow_path(path, ul, start, end, random_timing)
     else:
         draw_path(area, path, start, end)
         area.show("Solution Path")
 
 if __name__ == "__main__":
-    play(True, True)
+    play(True, True, True)

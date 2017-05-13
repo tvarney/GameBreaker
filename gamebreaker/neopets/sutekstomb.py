@@ -109,7 +109,7 @@ class Suteks(object):
                 time.sleep(1.0)
                 if pos != pyautogui.position():
                     exit(1) # TODO: Change this so we don't kill the process!
-                pyautogui.moveTo(ul[0] + 140, ul[1] + 260)
+                pyautogui.moveTo(ul[0] + 140, ul[1] + 300)
                 pyautogui.click()
                 continue
 
@@ -188,29 +188,38 @@ def find_move(grid):
             if grid[y][x] < 0:
                 continue
             if x >= 1:
-                nvalue = _test_move_left(x, y, grid)
-                if nvalue > value:
+                nvalue = _test_move_left(x, y, grid) + _test_move_right(x - 1, y, grid)
+                if nvalue >= value:
                     move = Move((x, y), (x - 1, y))
                     value = nvalue
-            if x <= 8:
-                nvalue = _test_move_right(x, y, grid)
-                if nvalue > value:
-                    move = Move((x, y), (x + 1, y))
-                    value = nvalue
+            #if x <= 8:
+            #    nvalue = _test_move_right(x, y, grid)
+            #    if nvalue > value:
+            #        move = Move((x, y), (x + 1, y))
+            #        value = nvalue
             if y >= 1:
-                nvalue = _test_move_up(x, y, grid)
-                if nvalue > value:
+                nvalue = _test_move_up(x, y, grid) + _test_move_down(x, y - 1, grid)
+                if nvalue >= value:
                     move = Move((x, y), (x, y - 1))
                     value = nvalue
-            if y <= 8:
-                nvalue = _test_move_down(x, y, grid)
-                if nvalue > value:
-                    move = Move((x, y), (x, y + 1))
-                    value = nvalue
+            #if y <= 8:
+            #    nvalue = _test_move_down(x, y, grid)
+            #    if nvalue > value:
+            #        move = Move((x, y), (x, y + 1))
+            #        value = nvalue
             # Stop as soon as we find the best move possible rating 4
             if value == 4:
                 return move
     return move
+
+
+def _bomb_above(x, y, grid):
+    if y <= 1:
+        return False
+    for i in range(y-1):
+        if grid[i][x] == Tile.Bomb.id():
+            return True
+    return False
 
 
 def _test_move_up(x, y, grid) -> int:
@@ -231,7 +240,7 @@ def _test_move_up(x, y, grid) -> int:
     if xp1 and xm1:
         r += 1
     if ym3 and ym2:
-        r += 1
+        r += 1.25 + (0.5 if _bomb_above(x, y-3, grid) else 0.0)
     return r
 
 
@@ -253,7 +262,7 @@ def _test_move_down(x, y, grid) -> int:
     if xp1 and xm1:
         r += 1
     if yp3 and yp2:
-        r += 1
+        r += 1.25 + (0.5 if _bomb_above(x, y, grid) else 0.0)
     return r
 
 
@@ -268,14 +277,23 @@ def _test_move_left(x, y, grid) -> int:
     xm2 = False if x < 2 else grid[y][x - 2] in matches
 
     r = 0
+    vert = False
+    b_y = y
     if ym2 and ym1:
-        r += 1
+        r += 1.25
+        vert = True
+        b_y = y - 2
     if yp2 and yp1:
-        r += 1
+        r += 1.25
+        vert = True
     if yp1 and ym1:
-        r += 1
+        r += 1.25
+        vert = True
+        b_y = y - 1
     if xm3 and xm2:
         r += 1
+    if vert and _bomb_above(x, b_y, grid):
+        r += 0.5
     return r
 
 
@@ -291,15 +309,23 @@ def _test_move_right(x, y, grid) -> int:
     xp2 = False if x > 7 else grid[y][x + 2] in matches
 
     r = 0
+    vert = False
+    b_y = y
     if ym2 and ym1:
-        r += 1
+        r += 1.25
+        vert = True
+        b_y = y - 2
     if yp1 and yp2:
-        r += 2
+        r += 1.25
+        vert = True
     if yp1 and ym1:
-        r += 1
+        r += 1.25
+        vert = True
+        b_y = y - 1
     if xp3 and xp2:
         r += 1
-
+    if vert and _bomb_above(x, b_y, grid):
+        r += 0.5
     return r
 
 if __name__ == "__main__":
